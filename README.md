@@ -1,0 +1,2 @@
+这是一个Flowable的简单流程Demo。
+使用的技术包括SpringBoot、SpringSecurity、Vue、Axios、Flowable、MySql、MyBatis等
