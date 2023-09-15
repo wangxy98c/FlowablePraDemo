@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>员工请假</title>
+
+<!--    axios引入-->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<!--    vue3&#45;&#45;CDN引入-->
+<!--     !!!! 注意必须先引入vue再引入element 。否则会出错-->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<!--    elementPlus引用-->
+    <link rel="stylesheet" href="//unpkg.com/element-plus/dist/index.css" />
+    <script src="//unpkg.com/vue@3"></script>
+    <script src="//unpkg.com/element-plus"></script>
+</head>
+<body>
+<div id="app">
+    <div>
+        <h1>提交请假申请</h1>
+        <table>
+            <tr>
+                <td>请假天数：</td>
+                <td><el-input v-model="afl.days" placeholder="请输入天数" /></td>
+            </tr>
+            <tr>
+                <td>请假理由：</td>
+                <td><el-input v-model="afl.reason" placeholder="请输入请假理由" /></td>
+            </tr>
+            <tr>
+                <td>请假起始时间：</td>
+                <td>
+                    <el-date-picker
+                        v-model="afl.startTime"
+                        type="datetime"
+                        format="YYYY-MM-DD HH:mm"
+                        value-format="YYYY-MM-DD HH:mm"
+                        placeholder="选择开始时间"
+                    />
+                </td>
+            </tr>
+            <tr>
+                <td>请假结束时间：</td>
+                <td>
+                    <el-date-picker
+                        v-model="afl.endTime"
+                        type="datetime"
+                        format="YYYY-MM-DD HH:mm"
+                        value-format="YYYY-MM-DD HH:mm"
+                        placeholder="选择结束时间"
+                    />
+                </td>
+            </tr>
+            <tr>
+                <td>请假审批人：</td>
+                <td>
+                    <el-select v-model="afl.approveUser" class="m-2" placeholder="选择审批人">
+                        <el-option
+                                v-for="item in users"
+                                :key="item.id"
+                                :label="item.username"
+                                :value="item.username"
+                        />
+                    </el-select>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <el-button type="primary" @click="showMessage">提交请假申请</el-button>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div>
+        <div>
+            <el-tag>我的请假申请</el-tag>
+            <el-table :data="unapproveProcess" stripe style="width: 100%">
+                <el-table-column prop="days" label="请假天数"></el-table-column>
+                <el-table-column prop="reason" label="请假理由"></el-table-column>
+                <el-table-column prop="startTime" label="起始时间"></el-table-column>
+                <el-table-column prop="endTime" label="结束时间" ></el-table-column>
+                <el-table-column prop="approveUser" label="审批人" ></el-table-column>
+                <el-table-column label="操作">
+                    <template #default="scope">
+                        <el-button type="primary" text @click="showImage(scope.row)">查看</el-button>
+                        <el-button ></el-button>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </div>
+        <div style="margin-top: 20px">
+            <el-tag>需要我来通过的假条</el-tag>
+            <el-table :data="tasks" stripe style="width: 100%">
+                <el-table-column prop="days" label="请假天数"></el-table-column>
+                <el-table-column prop="reason" label="请假理由"></el-table-column>
+                <el-table-column prop="startTime" label="起始时间"></el-table-column>
+                <el-table-column prop="endTime" label="结束时间" ></el-table-column>
+                <el-table-column prop="applicant" label="申请人" ></el-table-column>
+                <el-table-column label="操作">
+                    <template #default="scope">
+                        <el-button type="primary" text @click="handleapproval(scope.row,true)">同意</el-button>
+                        <el-button type="danger" text @click="handleapproval(scope.row,false)">拒绝</el-button>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </div>
+        <div>
+            <el-tag>这里是历史请假的展示，后台接口已完成。前端不想弄了</el-tag>
+        </div>
+        <div>
+            <el-dialog
+                    v-model="centerDialogVisible"
+                    title="审批进度"
+                    width="700px"
+                    align-center
+            >
+                <span>审批进度</span>
+                <img :src="processImageUrl" alt="审批进度" width="500px"/>
+                <template #footer>
+                    <span class="dialog-footer">
+                    <el-button @click="centerDialogVisible = false">知道了</el-button>
+                    </span>
+                </template>
+            </el-dialog>
+        </div>
+    </div>
+</div>
+</body>
+<script>
+    const { createApp, ref ,reactive} = Vue
+    //注意 ，这里必须 const app=createApp 再 app.use.mount
+    //如果直接createApp().use.mount在使用this.config.globalProperties会出错
+    const app=createApp({
+        setup() {
+            const users=ref([])
+            const unapproveProcess=ref([])
+            const processImageUrl=ref([])
+            const centerDialogVisible=ref(false);
+            const tasks=ref([])
+            const afl = ref({
+                days:0,
+                reason:null,
+                startTime:null,
+                endTime:null,
+                approveUser:null,
+            })
+            const handleapproval=(data,approval)=>{
+                console.log('=======>',data);
+                //data[approval]=approval
+                data.approval=approval;//原本是null（从后台返回来的
+                console.log('后=====>',data)
+                axios.post('/approval',data)
+                    .then(function (response) {//其实这里都应该有data.status==200的判断的，忘记写了。也懒得改了
+                        if(response.status==200){
+                            app.config.globalProperties.$message({
+                                message: '审批完成'+response.data.message,
+                                type: 'success'
+                            })
+                        }
+                        inittasks();
+                    })
+                    .catch(function (error) {
+                        console.log(error);
+                    });
+            }
+            const inittasks=()=>{
+                axios.get('/tasks')
+                    .then(function (response) {
+                        console.log(response)
+                        tasks.value=response.data;
+                    })
+                    .catch(function (error) {
+                        console.log(error);
+                    });
+            }
+            inittasks();
+            const loadUnapproveProcess=()=>{
+                axios.get('/unapprove')
+                    .then(function (response) {
+                        console.log(response)
+                        unapproveProcess.value=response.data;
+                    })
+                    .catch(function (error) {
+                        console.log(error);
+                    });
+            }
+            const showImage=(data)=>{
+                centerDialogVisible.value=true;
+                processImageUrl.value='/image/'+data.processId;
+            }
+            function showMessage() {//submit
+                //此处不可以使用this.$message。this.$message 并不会生效，这是因为在 Vue 3 中
+                // setup 函数内部的 this 不再指向 Vue 组件实例。全新的设计如下方式
+                console.log(afl.value)
+                axios.post('/ask_for_leave',afl.value)
+                    .then(function (response) {
+                        app.config.globalProperties.$message({
+                            message: '这是一条消息',
+                            type: 'success'
+                        })
+                        console.log(response);
+                        loadUnapproveProcess();
+                    })
+                    .catch(function (error) {
+                        console.log(error);
+                    });
+            }
+            const initUsers=()=>{
+                axios.get('/users')
+                .then(function (response) {
+                    users.value=response.data;
+                })
+                .catch(function (error) {
+                    console.log(error);
+                });
+            }
+            initUsers();
+            loadUnapproveProcess();
+            return {
+                afl,users,showMessage,unapproveProcess,showImage,centerDialogVisible,processImageUrl,tasks,handleapproval
+            }
+        }
+    })
+    app.use(ElementPlus).mount('#app')//#app表示app的那个div都进行vue的渲染
+</script>
+</html>
